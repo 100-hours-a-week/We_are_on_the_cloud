@@ -60,6 +60,23 @@ jobs:
               sudo docker stop backend-container || true
               sudo docker rm backend-container || true
 
+              sudo docker run -d \
+                --name backend-container \
+                -e ENCRYPTION_KEY=${ENCRYPTION_KEY} \
+                -e ENCRYPTION_SALT=${ENCRYPTION_SALT} \
+                -e JWT_SECRET=${JWT_SECRET} \
+                -e MONGO_URI=${MONGO_URI} \
+                -e REDIS_HOST=${REDIS_HOST} \
+                -e REDIS_PORT=${REDIS_PORT} \
+                -e REDIS_PASSWORD=${REDIS_PASSWORD} \
+                -e PORT=${PORT} \
+                -e WS_PORT=${WS_PORT} \
+                -e OPENAI_API_KEY=${OPENAI_API_KEY} \
+                -e SESSION_STORE=${SESSION_STORE} \
+                -p ${PORT}:${PORT} \
+                -p ${WS_PORT}:${WS_PORT} \
+                ${DOCKER_USERNAME}/backend-app:latest
+
           EOF
               done
 
