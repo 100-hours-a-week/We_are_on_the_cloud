@@ -13,6 +13,7 @@ import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 
@@ -48,7 +49,8 @@ public class RedisSessionStore implements SessionStore {
             final byte[] sessionIdBytes = session.getSessionId().getBytes();
             final long finalTtlMillis = ttlMillis;
 
-            redis.execute((RedisCallback<Object>) connection -> {
+            // --- MULTI / EXEC ---
+            List<Object> results = redis.execute((RedisCallback<List<Object>>) connection -> {
 
                 connection.multi();
 
@@ -70,9 +72,25 @@ public class RedisSessionStore implements SessionStore {
                         sessionIdBytes
                 );
 
-                // 반드시 exec 결과 리턴해야 트랜잭션이 보장된다!
                 return connection.exec();
             });
+
+            if (results == null || results.isEmpty()) {
+                throw new IllegalStateException("Redis MULTI EXEC failed");
+            }
+
+            String check = redis.opsForValue().get(sessionKey(session.getSessionId()));
+
+            if (check == null) {
+                // propagation delay 발생 가능 → 5ms만 기다렸다가 재확인
+                Thread.sleep(5);
+                check = redis.opsForValue().get(sessionKey(session.getSessionId()));
+            }
+
+            if (check == null) {
+                throw new IllegalStateException("Redis session not ready (propagation delay)");
+            }
+
             return session;
         } catch (Exception e) {
             throw new RuntimeException("세션 저장 실패", e);

@@ -8,6 +8,7 @@ import com.ktb.chatapp.service.JwtService;
 import com.ktb.chatapp.service.SessionCreationResult;
 import com.ktb.chatapp.service.SessionMetadata;
 import com.ktb.chatapp.service.SessionService;
+import com.mongodb.client.MongoDatabase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -25,6 +26,7 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -36,6 +38,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
+import org.bson.Document;
 
 @Tag(name = "인증 (Authentication)", description = "사용자 인증 관련 API - 회원가입, 로그인, 로그아웃, 토큰 관리")
 @Slf4j
@@ -50,6 +53,7 @@ public class AuthController {
     private final JwtService jwtService;
     private final SessionService sessionService;
     private final ApplicationEventPublisher eventPublisher;
+    private final MongoTemplate mongoTemplate;
 
     @Operation(summary = "인증 API 상태 확인", description = "인증 API의 사용 가능한 엔드포인트 목록을 반환합니다.")
     @ApiResponses({
@@ -107,6 +111,9 @@ public class AuthController {
                     .build();
 
             user = userRepository.save(user);
+
+            MongoDatabase db = mongoTemplate.getDb();
+            db.runCommand(new Document("ping", 1));
 
             LoginResponse response = LoginResponse.builder()
                     .success(true)

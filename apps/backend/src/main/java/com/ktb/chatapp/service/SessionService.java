@@ -98,18 +98,18 @@ public class SessionService {
                 return SessionValidationResult.invalid("SESSION_EXPIRED", "세션이 만료되었습니다.");
             }
 
-            // 마지막 활동 시간이 1분 이상 지났을 때만 업데이트 (불필요한 I/O 감소)
-//            if (now - session.getLastActivity() > 60000) {
-//                session.setLastActivity(now);
-//                session.setExpiresAt(Instant.now().plusSeconds(SESSION_TTL_SEC));
-//                sessionStore.save(session);
-//            }
+//             마지막 활동 시간이 1분 이상 지났을 때만 업데이트 (불필요한 I/O 감소)
+            if (now - session.getLastActivity() > 60000) {
+                session.setLastActivity(now);
+                session.setExpiresAt(Instant.now().plusSeconds(SESSION_TTL_SEC));
+                sessionStore.save(session);
+            }
 
             // TODO : I/O 서버부하
             // Update last activity
-            session.setLastActivity(now);
-            session.setExpiresAt(Instant.now().plusSeconds(SESSION_TTL_SEC));
-            session = sessionStore.save(session);
+//            session.setLastActivity(now);
+//            session.setExpiresAt(Instant.now().plusSeconds(SESSION_TTL_SEC));
+//            session = sessionStore.save(session);
 
 //            SessionData sessionData = toSessionData(session);
             return SessionValidationResult.valid(toSessionData(session));
