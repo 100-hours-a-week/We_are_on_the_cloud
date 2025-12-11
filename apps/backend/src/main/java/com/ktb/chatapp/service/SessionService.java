@@ -151,7 +151,7 @@ public class SessionService {
             }
         } catch (Exception e) {
             log.error("Session removal error for userId: {}, sessionId: {}", userId, sessionId, e);
-            throw new RuntimeException("세션 삭제 중 오류가 발생했습니다.", e);
+            return;
         }
     }
 

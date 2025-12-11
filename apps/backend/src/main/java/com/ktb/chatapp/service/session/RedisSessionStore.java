@@ -3,6 +3,7 @@ package com.ktb.chatapp.service.session;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ktb.chatapp.model.Session;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -13,6 +14,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 
+@Slf4j
 @Service
 @Primary
 @ConditionalOnProperty(name = "session.store", havingValue = "redis")
@@ -74,15 +76,23 @@ public class RedisSessionStore implements SessionStore {
 
     @Override
     public void deleteAll(String userId) {
-        String key = userSessionsKey(userId);
-        var sessionIds = redis.opsForSet().members(key);
+        try {
+            String key = userSessionsKey(userId);
+            var sessionIds = redis.opsForSet().members(key);
 
-        if (sessionIds != null) {
-            for (String sessionId : sessionIds) {
-                redis.delete(sessionKey(sessionId));
+            if (sessionIds != null) {
+                for (String sessionId : sessionIds) {
+                    try {
+                        redis.delete(sessionKey(sessionId));
+                    } catch (Exception ex) {
+                        log.warn("단일 세션 삭제 실패(userId={}, sessionId={})", userId, sessionId, ex);
+                    }
+                }
             }
-        }
 
-        redis.delete(key);
+            redis.delete(key);
+        } catch (Exception e) {
+            log.error("deleteAll 실패 (전체 무시)", e);
+        }
     }
 }
