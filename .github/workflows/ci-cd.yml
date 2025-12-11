@@ -32,8 +32,7 @@ jobs:
         uses: webfactory/ssh-agent@v0.5.4
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
-
-      - name: Create env file
+      - name: CREATE env file
         run: |
           cat > backend.env <<EOF
           ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
@@ -51,7 +50,7 @@ jobs:
 
       - name: Copy env to Servers
         run: |
-          for server in $(echo '${{ secrets.EC2_SERVERS }}' | jq -r '.[]'); do
+          for server in $(echo "${{ secrets.EC2_SERVERS }}" | jq -r '.[]'); do
             echo "Copying env to $server"
             scp -o StrictHostKeyChecking=no backend.env ubuntu@"$server":/home/ubuntu/backend.env
           done
@@ -62,7 +61,7 @@ jobs:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         run: |
           set -e
-          for server in $(echo "$SERVERS" | jq -r '.[]'); do
+          for server in $(echo $SERVERS | jq -r '.[]'); do
             echo "Deploying to $server..."
             ssh -o StrictHostKeyChecking=no ubuntu@"$server" bash -s <<EOF
           set -e
