@@ -91,6 +91,7 @@ const ChatMessages = ({
       onReactionRemove
     };
 
+    console.log('메세지 렌더링: ', msg);
     if(msg.type === "file") console.log('메세지 렌더링: ', msg);
 
     const MessageComponent = {
@@ -131,8 +132,7 @@ const ChatMessages = ({
     };
 
     if (msg.type === 'file') {
-      // 디버깅이 필요하면 여기서 한 번만 로그
-      // console.log('파일 메세지 렌더링: ', msg);
+      console.log('파일 메세지 렌더링: ', msg);
     }
 
     const MessageComponent = {

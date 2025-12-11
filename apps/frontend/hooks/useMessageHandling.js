@@ -93,54 +93,47 @@ export const useMessageHandling = (socketRef, currentUser, router, handleSession
 
         console.log("전송 결과는: ", uploadedFile);
 
-       if (!uploadedFile.success) {
+        if (!uploadedFile.success) {
           console.log('업로드 실패');
-         throw new Error(uploadResponse.message || '파일 업로드에 실패했습니다.');
-       }
+          throw new Error(uploadedFile.message || '파일 업로드에 실패했습니다.');
+        }
 
-       const tempFile = {
-            _id: uploadedFile.data.file._id,    //uuid
-            filename: uploadedFile.data.file.filename,           
-            originalname: uploadedFile.data.file.originalName,
-            mimeType: uploadedFile.data.file.mimeType,
-            size: uploadedFile.data.file.size,
-         }
+        const uploadedFileData = {
+          _id: uploadedFile.file._id, 
+          filename: uploadedFile.file.filename,           
+          originalname: uploadedFile.file.originalName,
+          mimeType: uploadedFile.file.mimeType,
+          size: uploadedFile.file.size,
+        }
 
-         console.log('임시: ', tempFile);
+        //최종적으로 socket에 메세지 전송
+        socketRef.current.emit('chatMessage', {
+          room: roomId,
+          type: 'file',
+          content: messageData.content || '',
+          fileData: uploadedFileData,
+        });
 
-       //최종적으로 socket에 메세지 전송
-       socketRef.current.emit('chatMessage', {
-         room: roomId,
-         type: 'file',
-         content: messageData.content || '',
-         fileData: tempFile,
-       });
-
-       console.log('emit 이후');
-
-       setFilePreview(null);
-       setMessage('');
-       setUploading(false);
-       setUploadProgress(0);
+        setFilePreview(null);
+        setMessage('');
+        setUploading(false);
+        setUploadProgress(0);
 
      } else if (messageData.content?.trim()) {
-        console.log('채팅 내용: ', messageData.content?.trim());
-       socketRef.current.emit('chatMessage', {
-         room: roomId,
-         type: 'text',
-         content: messageData.content.trim()
-       });
+        
+        socketRef.current.emit('chatMessage', {
+          room: roomId,
+          type: 'text',
+          content: messageData.content.trim()
+        });
 
-       setMessage('');
+        setMessage('');
      }
 
      setShowEmojiPicker(false);
      setShowMentionList(false);
 
    } catch (error) {
-
-    console.log('에러에러에러', error);
-
 
      if (error.message?.includes('세션') || 
          error.message?.includes('인증') || 

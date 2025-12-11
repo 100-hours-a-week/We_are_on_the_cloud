@@ -28,13 +28,13 @@ const FileMessage = ({
   const [error, setError] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const messageDomRef = useRef(null);
+
   //그린: 이미지 다운로드 throttling 적용을 위한 useRef 사용
   const downloadGuardRef = useRef({
     inFlight: new Set(),      // filename
     lastStartedAt: new Map(), // filename -> timestamp
   });
   const DOWNLOAD_COOLDOWN_MS = 2000; //같은 filname에 대해서는 2초동안 무시
-
 
   // useEffect(() => {
   //   console.log('useEffect');
@@ -51,11 +51,11 @@ const FileMessage = ({
 
   //그린: 수정 버전
   useEffect(() => {
-    console.log('useEffect');
+  
     if (!msg?.fileId) return;
        
     console.log('메세지가 파일임을 확인', msg);
-    const url = `https://d2e0q05g121sq3.cloudfront.net/chat/${msg.fileId}`;
+    const url = `https://dypusta48vkr4.cloudfront.net/chat/${msg.fileId}`;
     console.log('S3 이미지 경로: ', url);
     setPreviewUrl(url);
     console.debug('Preview URL generated:', {
@@ -65,10 +65,10 @@ const FileMessage = ({
     
   }, [msg?.fileId, user?.token, user?.sessionId]);
 
-  if (!msg?.fileId) {
-    console.error('FileId is missing in message:', msg);
-    return null;
-  }
+  // if (!msg?.fileId) {
+  //   console.error('FileId is missing in message:', msg);
+  //   return null;
+  // }
 
   const formattedTime = new Date(msg.timestamp).toLocaleString('ko-KR', {
     year: 'numeric',
@@ -132,38 +132,55 @@ const FileMessage = ({
     setError(null);
 
     const filename = msg.file?.filename;
+
+    console.log('다운로드', previewUrl);
+
+    //const filename = msg.file?.filename;
     if(!msg.fileId) {
       throw new Error('파일 정보가 없습니다.');
     }
 
-    //그린: 다운로드 버튼 연타 방지
-    const guard = downloadGuardRef.current;
-    const now = Date.now();
-    const last = guard.lastStartedAt.get(filename) ?? 0;
+    // //그린: 다운로드 버튼 연타 방지
+    // const guard = downloadGuardRef.current;
+    // const now = Date.now();
+    // const last = guard.lastStartedAt.get(filename) ?? 0;
 
-    if(guard.inFlight.has(filename)) return; //이미 파일을 다운로드 중인경우
-    if(now - last < DOWNLOAD_COOLDOWN_MS) return; //쿨다운 중이면 무시
+    // if(guard.inFlight.has(filename)) return; //이미 파일을 다운로드 중인경우
+    // if(now - last < DOWNLOAD_COOLDOWN_MS) return; //쿨다운 중이면 무시
 
-    guard.inFlight.add(filename);
-    guard.lastStartedAt.set(filename, now);
+    // guard.inFlight.add(filename);
+    // guard.lastStartedAt.set(filename, now);
 
     try {
       if (!user?.token || !user?.sessionId) {
         throw new Error('인증 정보가 없습니다.');
       }
 
-      const baseUrl = `https://d2e0q05g121sq3.cloudfront.net/chat/${msg.fileId}`;
-      const authenticatedUrl = `${baseUrl}?token=${encodeURIComponent(user?.token)}&sessionId=${encodeURIComponent(user?.sessionId)}&download=true`;
-      
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = authenticatedUrl;
-      document.body.appendChild(iframe);
+      const res = await fetch(previewUrl, {
+      method: 'GET',
+      credentials: 'omit', // S3/CloudFront에는 크리덴셜 필요 없음
+    });
 
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-        guard.inFlight.delete(filename);
-      }, 2000);
+    if (!res.ok) {
+      throw new Error(`파일 다운로드 실패 (status: ${res.status})`);
+    }
+
+    const blob = await res.blob();
+
+    const blobUrl = window.URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename || 'download';
+    link.style.display = 'none';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setTimeout(() => {
+      window.URL.revokeObjectURL(blobUrl);
+    }, 1000);
 
     } catch (error) {
       console.error('File download error:', error);
@@ -171,10 +188,13 @@ const FileMessage = ({
     }
   };
 
+
   const handleViewInNewTab = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setError(null);
+
+    console.log("msg: ", msg);
 
     try {
       if (!msg.fileId) {
@@ -186,7 +206,7 @@ const FileMessage = ({
       }
 
       // const baseUrl = fileService.getFileUrl(msg.file.filename, true);
-      const baseUrl = `https://d2e0q05g121sq3.cloudfront.net/chat/${msg.fileId}`;
+      const baseUrl = `https://dypusta48vkr4.cloudfront.net/chat/${msg.fileId}`;
       const authenticatedUrl = `${baseUrl}?token=${encodeURIComponent(user?.token)}&sessionId=${encodeURIComponent(user?.sessionId)}`;
 
       const newWindow = window.open(authenticatedUrl, '_blank');
@@ -265,9 +285,7 @@ const FileMessage = ({
       }
 
       //const previewUrl = fileService.getPreviewUrl(msg.file, user?.token, user?.sessionId, true);
-      const previewUrl = `https://d2e0q05g121sq3.cloudfront.net/chat/${msg.fileId}`;
-
-      console.log('프리뷰: ', msg);
+      const previewUrl = `https://dypusta48vkr4.cloudfront.net/chat/${msg.fileId}`;
 
       return (
         <div className="bg-transparent-pattern">

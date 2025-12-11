@@ -83,6 +83,8 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
         body: JSON.stringify({ imageId: uuid }),
       });
 
+      console.log('saveRes: ', saveRes);
+
       if (!saveRes.ok) {
         const errorData = await saveRes.json().catch(() => ({}));
         throw new Error(errorData.message || '이미지 정보 저장에 실패했습니다.');
