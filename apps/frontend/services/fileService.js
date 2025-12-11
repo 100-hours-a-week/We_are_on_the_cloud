@@ -14,13 +14,13 @@ class FileService {
       image: {
         extensions: ['.jpg', '.jpeg', '.png', '.gif', '.webp'],
         mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-        maxSize: 10 * 1024 * 1024,
+        maxSize: 10 * 1024 * 1024, //10MB
         name: '이미지'
       },
       document: {
         extensions: ['.pdf'],
         mimeTypes: ['application/pdf'],
-        maxSize: 20 * 1024 * 1024,
+        maxSize: 20 * 1024 * 1024, //20MB
         name: 'PDF 문서'
       }
     };
@@ -80,25 +80,27 @@ class FileService {
       return validationResult;
     }
 
+    console.log('이미지 업로드: ', file);
+
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      
+      //그린: S3에 파일 업로드 -> 업로드 확인
+      const uuid = crypto.randomUUID();
+      const uploadUrl = `https://10-ktb-bootcamp-chat-ktb-3rd-files.s3.ap-northeast-2.amazonaws.com/chat/${uuid}`;
 
       const source = CancelToken.source();
       this.activeUploads.set(file.name, source);
 
-      const uploadUrl = this.baseUrl ?
-        `${this.baseUrl}/api/files/upload` :
-        '/api/files/upload';
+      console.log('uploadUrl: ', uploadUrl);
 
       // token과 sessionId는 axios 인터셉터에서 자동으로 추가되므로
       // 여기서는 명시적으로 전달하지 않아도 됩니다
-      const response = await axiosInstance.post(uploadUrl, formData, {
+      const response = await axios.put(uploadUrl, file, {
         headers: {
-          'Content-Type': 'multipart/form-data'
+          'Content-Type': file.type,
         },
         cancelToken: source.token,
-        withCredentials: true,
+        //withCredentials: true,
         onUploadProgress: (progressEvent) => {
           if (onProgress) {
             const percentCompleted = Math.round(
@@ -109,25 +111,30 @@ class FileService {
         }
       });
 
-      this.activeUploads.delete(file.name);
+      console.log('이미지 post 결과: ',response);
 
-      if (!response.data || !response.data.success) {
+      this.activeUploads.delete(uuid);
+
+      if (response.status < 200 || response.status >= 300) {
+        console.log('실실패패패ㅐㅍ패');
         return {
           success: false,
           message: response.data?.message || '파일 업로드에 실패했습니다.'
         };
       }
 
-      const fileData = response.data.file;
+      //const fileData = response.data.file;
       return {
         success: true,
         data: {
-          ...response.data,
           file: {
-            ...fileData,
-            url: this.getFileUrl(fileData.filename, true)
-          }
-        }
+            _id: uuid,                 
+            filename: uuid,          
+            originalName: file.name,
+            mimeType: file.type,
+            size: file.size,
+          },
+        },
       };
 
     } catch (error) {

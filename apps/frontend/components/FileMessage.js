@@ -28,19 +28,45 @@ const FileMessage = ({
   const [error, setError] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const messageDomRef = useRef(null);
-  useEffect(() => {
-    if (msg?.file) {
-      const url = fileService.getPreviewUrl(msg.file, user?.token, user?.sessionId, true);
-      setPreviewUrl(url);
-      console.debug('Preview URL generated:', {
-        filename: msg.file.filename,
-        url
-      });
-    }
-  }, [msg?.file, user?.token, user?.sessionId]);
+  //그린: 이미지 다운로드 throttling 적용을 위한 useRef 사용
+  const downloadGuardRef = useRef({
+    inFlight: new Set(),      // filename
+    lastStartedAt: new Map(), // filename -> timestamp
+  });
+  const DOWNLOAD_COOLDOWN_MS = 2000; //같은 filname에 대해서는 2초동안 무시
 
-  if (!msg?.file) {
-    console.error('File data is missing:', msg);
+
+  // useEffect(() => {
+  //   console.log('useEffect');
+  //   if (msg?.file) {
+  //     console.log('메세지가 파일임을 확인');
+  //     const url = fileService.getPreviewUrl(msg.file, user?.token, user?.sessionId, true);
+  //     setPreviewUrl(url);
+  //     console.debug('Preview URL generated:', {
+  //       filename: msg.file.filename,
+  //       url
+  //     });
+  //   }
+  // }, [msg?.file, user?.token, user?.sessionId]);
+
+  //그린: 수정 버전
+  useEffect(() => {
+    console.log('useEffect');
+    if (!msg?.fileId) return;
+       
+    console.log('메세지가 파일임을 확인', msg);
+    const url = `https://d2e0q05g121sq3.cloudfront.net/chat/${msg.fileId}`;
+    console.log('S3 이미지 경로: ', url);
+    setPreviewUrl(url);
+    console.debug('Preview URL generated:', {
+      filename: msg.fileId,
+      url
+    });
+    
+  }, [msg?.fileId, user?.token, user?.sessionId]);
+
+  if (!msg?.fileId) {
+    console.error('FileId is missing in message:', msg);
     return null;
   }
 
@@ -55,7 +81,9 @@ const FileMessage = ({
   }).replace(/\./g, '년').replace(/\s/g, ' ').replace('일 ', '일 ');
 
   const getFileIcon = () => {
-    const mimetype = msg.file?.mimetype || '';
+    //const mimetype = msg.file?.mimetype || '';
+    //그린 수정
+    const mimetype = (msg.metadata?.fileType) || '';
     const iconProps = { className: "w-5 h-5 flex-shrink-0" };
 
     if (mimetype.startsWith('image/')) return <Image {...iconProps} color="#00C853" />;
@@ -96,21 +124,35 @@ const FileMessage = ({
     />
   );
 
+
+
   const handleFileDownload = async (e) => {
     e.preventDefault();
     e.stopPropagation();
     setError(null);
 
-    try {
-      if (!msg.file?.filename) {
-        throw new Error('파일 정보가 없습니다.');
-      }
+    const filename = msg.file?.filename;
+    if(!msg.fileId) {
+      throw new Error('파일 정보가 없습니다.');
+    }
 
+    //그린: 다운로드 버튼 연타 방지
+    const guard = downloadGuardRef.current;
+    const now = Date.now();
+    const last = guard.lastStartedAt.get(filename) ?? 0;
+
+    if(guard.inFlight.has(filename)) return; //이미 파일을 다운로드 중인경우
+    if(now - last < DOWNLOAD_COOLDOWN_MS) return; //쿨다운 중이면 무시
+
+    guard.inFlight.add(filename);
+    guard.lastStartedAt.set(filename, now);
+
+    try {
       if (!user?.token || !user?.sessionId) {
         throw new Error('인증 정보가 없습니다.');
       }
 
-      const baseUrl = fileService.getFileUrl(msg.file.filename, false);
+      const baseUrl = `https://d2e0q05g121sq3.cloudfront.net/chat/${msg.fileId}`;
       const authenticatedUrl = `${baseUrl}?token=${encodeURIComponent(user?.token)}&sessionId=${encodeURIComponent(user?.sessionId)}&download=true`;
       
       const iframe = document.createElement('iframe');
@@ -120,7 +162,8 @@ const FileMessage = ({
 
       setTimeout(() => {
         document.body.removeChild(iframe);
-      }, 5000);
+        guard.inFlight.delete(filename);
+      }, 2000);
 
     } catch (error) {
       console.error('File download error:', error);
@@ -134,7 +177,7 @@ const FileMessage = ({
     setError(null);
 
     try {
-      if (!msg.file?.filename) {
+      if (!msg.fileId) {
         throw new Error('파일 정보가 없습니다.');
       }
 
@@ -142,7 +185,8 @@ const FileMessage = ({
         throw new Error('인증 정보가 없습니다.');
       }
 
-      const baseUrl = fileService.getFileUrl(msg.file.filename, true);
+      // const baseUrl = fileService.getFileUrl(msg.file.filename, true);
+      const baseUrl = `https://d2e0q05g121sq3.cloudfront.net/chat/${msg.fileId}`;
       const authenticatedUrl = `${baseUrl}?token=${encodeURIComponent(user?.token)}&sessionId=${encodeURIComponent(user?.sessionId)}`;
 
       const newWindow = window.open(authenticatedUrl, '_blank');
@@ -156,9 +200,59 @@ const FileMessage = ({
     }
   };
 
+  // const renderImagePreview = (originalname) => {
+  //   try {
+  //     if (!msg?.file?.filename) {
+  //       return (
+  //         <div className="flex items-center justify-center h-full bg-gray-100">
+  //           <Image className="w-8 h-8 text-gray-400" />
+  //         </div>
+  //       );
+  //     }
+
+  //     if (!user?.token || !user?.sessionId) {
+  //       throw new Error('인증 정보가 없습니다.');
+  //     }
+
+  //     const previewUrl = fileService.getPreviewUrl(msg.file, user?.token, user?.sessionId, true);
+
+  //     return (
+  //       <div className="bg-transparent-pattern">
+  //         <img
+  //           src={previewUrl}
+  //           alt={originalname}
+  //           className="max-w-[400px] max-h-[400px] object-cover object-center rounded-md"
+  //           onLoad={() => {
+  //             console.debug('Image loaded successfully:', originalname);
+  //           }}
+  //           onError={(e) => {
+  //             console.error('Image load error:', {
+  //               error: e.error,
+  //               originalname
+  //             });
+  //             e.target.onerror = null;
+  //             e.target.src = '/images/placeholder-image.png';
+  //             setError('이미지를 불러올 수 없습니다.');
+  //           }}
+  //           loading="lazy"
+  //           data-testid="file-image-preview"
+  //         />
+  //       </div>
+  //     );
+  //   } catch (error) {
+  //     console.error('Image preview error:', error);
+  //     setError(error.message || '이미지 미리보기를 불러올 수 없습니다.');
+  //     return (
+  //       <div className="flex items-center justify-center h-full bg-gray-100">
+  //         <Image className="w-8 h-8 text-gray-400" />
+  //       </div>
+  //     );
+  //   }
+  // };
+
   const renderImagePreview = (originalname) => {
     try {
-      if (!msg?.file?.filename) {
+      if (!msg?.fileId) {
         return (
           <div className="flex items-center justify-center h-full bg-gray-100">
             <Image className="w-8 h-8 text-gray-400" />
@@ -170,7 +264,10 @@ const FileMessage = ({
         throw new Error('인증 정보가 없습니다.');
       }
 
-      const previewUrl = fileService.getPreviewUrl(msg.file, user?.token, user?.sessionId, true);
+      //const previewUrl = fileService.getPreviewUrl(msg.file, user?.token, user?.sessionId, true);
+      const previewUrl = `https://d2e0q05g121sq3.cloudfront.net/chat/${msg.fileId}`;
+
+      console.log('프리뷰: ', msg);
 
       return (
         <div className="bg-transparent-pattern">
@@ -207,13 +304,18 @@ const FileMessage = ({
   };
 
   const renderFilePreview = () => {
+    console.log('채팅 렌더링: ', msg);
     const mimetype = msg.file?.mimetype || '';
-    const originalname = getDecodedFilename(msg.file?.originalname || 'Unknown File');
-    const size = fileService.formatFileSize(msg.file?.size || 0);
+    // const originalname = getDecodedFilename(msg.file?.originalname || 'Unknown File');
+    const originalname = msg.metadata.originalName || 'Unknown File';
+    const size = fileService.formatFileSize(msg.metadata.fileSize || 0);
+
 
     const previewWrapperClass = "overflow-hidden";
 
-    if (mimetype.startsWith('image/')) {
+    // if (mimetype.startsWith('image/')) {
+    if (msg.metadata.fileType.startsWith('image/')) {
+      console.log('이미지 확인');
       return (
         <div className={previewWrapperClass}>
           {renderImagePreview(originalname)}

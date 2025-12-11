@@ -35,6 +35,7 @@ export const useRoomHandling = (
   const MESSAGE_TIMEOUT = 10000;
   const MESSAGE_RETRY_DELAY = 2000;
 
+  //그린 타이머 정리
   const clearAllTimeouts = useCallback(() => {
     if (setupTimeoutRef.current) {
       clearTimeout(setupTimeoutRef.current);

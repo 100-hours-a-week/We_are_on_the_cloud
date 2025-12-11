@@ -64,7 +64,9 @@ export const useMessageHandling = (socketRef, currentUser, router, handleSession
     });
   }, [socketRef, router?.query?.room, loadingMessages, messages, setLoadingMessages]);
 
+  //{type:'file', content:message.trim(), fileData: file}
  const handleMessageSubmit = useCallback(async (messageData) => {
+  console.log('handleMessageSubmit: ', messageData);
    if (!socketRef.current?.connected || !currentUser) {
      Toast.error('채팅 서버와 연결이 끊어졌습니다.');
      return;
@@ -82,29 +84,39 @@ export const useMessageHandling = (socketRef, currentUser, router, handleSession
         setUploadError(null);
         setUploadProgress(0);
 
-        const uploadResponse = await fileService.uploadFile(
+        const uploadedFile = await fileService.uploadFile(
           messageData.fileData.file,
           (progress) => setUploadProgress(progress),
           currentUser.token,
           currentUser.sessionId
         );
 
-       if (!uploadResponse.success) {
+        console.log("전송 결과는: ", uploadedFile);
+
+       if (!uploadedFile.success) {
+          console.log('업로드 실패');
          throw new Error(uploadResponse.message || '파일 업로드에 실패했습니다.');
        }
 
+       const tempFile = {
+            _id: uploadedFile.data.file._id,    //uuid
+            filename: uploadedFile.data.file.filename,           
+            originalname: uploadedFile.data.file.originalName,
+            mimeType: uploadedFile.data.file.mimeType,
+            size: uploadedFile.data.file.size,
+         }
+
+         console.log('임시: ', tempFile);
+
+       //최종적으로 socket에 메세지 전송
        socketRef.current.emit('chatMessage', {
          room: roomId,
          type: 'file',
          content: messageData.content || '',
-         fileData: {
-           _id: uploadResponse.data.file._id,
-           filename: uploadResponse.data.file.filename,
-           originalname: uploadResponse.data.file.originalname,
-           mimetype: uploadResponse.data.file.mimetype,
-           size: uploadResponse.data.file.size
-         }
+         fileData: tempFile,
        });
+
+       console.log('emit 이후');
 
        setFilePreview(null);
        setMessage('');
@@ -112,6 +124,7 @@ export const useMessageHandling = (socketRef, currentUser, router, handleSession
        setUploadProgress(0);
 
      } else if (messageData.content?.trim()) {
+        console.log('채팅 내용: ', messageData.content?.trim());
        socketRef.current.emit('chatMessage', {
          room: roomId,
          type: 'text',
@@ -125,6 +138,10 @@ export const useMessageHandling = (socketRef, currentUser, router, handleSession
      setShowMentionList(false);
 
    } catch (error) {
+
+    console.log('에러에러에러', error);
+
+
      if (error.message?.includes('세션') || 
          error.message?.includes('인증') || 
          error.message?.includes('토큰')) {

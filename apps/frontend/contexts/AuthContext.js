@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, useCallback, useRef, useContext } from 'react';
+import { createContext, useState, useEffect, useCallback, useRef, useContext, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import socketService from '../services/socket';
 import authService from '../services/authService';
@@ -275,6 +275,21 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user, saveUser]);
 
+  // const value = {
+  //   user,
+  //   isAuthenticated: !!user,
+  //   isLoading,
+  //   login,
+  //   logout,
+  //   register,
+  //   updateProfile,
+  //   updateUser,
+  //   verifyToken,
+  //   refreshToken
+  // };
+
+
+  //그린 useMemo 적용
   const value = {
     user,
     isAuthenticated: !!user,
@@ -287,7 +302,7 @@ export const AuthProvider = ({ children }) => {
     verifyToken,
     refreshToken
   };
-
+  
   return (
     <AuthContext.Provider value={value}>
       {children}
@@ -309,7 +324,10 @@ export const withAuth = (WrappedComponent) => {
     useEffect(() => {
       // 로딩이 끝나고 인증되지 않은 경우 리다이렉트
       if (!isLoading && !isAuthenticated) {
-        router.replace('/?redirect=' + router.asPath);
+        const publicPages = ['/', '/register', '/login'];
+        if(!publicPages.includes(router.pathname)){
+          router.replace('/?redirect=' + router.asPath);
+        }
       }
     }, [isAuthenticated, isLoading, router]);
 
