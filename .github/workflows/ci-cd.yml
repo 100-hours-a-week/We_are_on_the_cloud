@@ -32,7 +32,6 @@ jobs:
         uses: webfactory/ssh-agent@v0.5.4
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
-
       - name: CREATE env file
         run: |
           cat > backend.env <<EOF
@@ -75,30 +74,29 @@ jobs:
             -p 5001:5001 \
             -p 5002:5002 \
             ${DOCKER_USERNAME}/backend-app:latest
+          rm -f /home/ubuntu/backend.env
           EOF
           done
 
-      # - name: Health Check
-      #   run: |
-      #     SERVERS=${{ secrets.EC2_SERVERS }}
+      - name: Health Check
+        run: |
+          for server in $(echo '${{ secrets.EC2_SERVERS }}' | jq -r '.[]'); do
+            echo "Checking $server..."
 
-      #     for server in $(echo $SERVERS | jq -r '.[]'); do
-      #       echo "Checking $server..."
+            for i in {1..30}; do
+              RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://$server:5001/api/health || echo "000")
 
-      #       for i in {1..30}; do
-      #         RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://$server:5001/api/health || echo "000")
+              if [ "$RESPONSE" -eq 200 ]; then
+                echo "Health check passed for $server"
+                break
+              fi
 
-      #         if [ "$RESPONSE" -eq 200 ]; then
-      #           echo "Health check passed for $server"
-      #           break
-      #         fi
+              echo "Try $i/30 → $server not ready (code: $RESPONSE). Waiting..."
+              sleep 2
+            done
 
-      #         echo "Try $i/30 → $server Not ready (code: $RESPONSE). Waiting..."
-      #         sleep 2
-      #       done
-
-      #       if [ "$RESPONSE" -ne 200 ]; then
-      #         echo "Health check failed for $server"
-      #         exit 1
-      #       fi
-      #     done
+            if [ "$RESPONSE" -ne 200 ]; then
+              echo "Health check failed for $server"
+              exit 1
+            fi
+          done
